@@ -3,12 +3,13 @@ import { Injectable } from '@angular/core';
 import { Storage } from '@ionic/storage-angular';
 import { Browser } from '@capacitor/browser';
 import { File } from '@awesome-cordova-plugins/file/ngx';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { EmailComposer, EmailComposerOptions } from '@awesome-cordova-plugins/email-composer/ngx';
 
 import { Registro } from '../models/registro.model';
 import { BehaviorSubject } from 'rxjs';
 import { NavController } from '@ionic/angular';
-import { FileWriter } from '@awesome-cordova-plugins/file/ngx';
+
 
 @Injectable({
   providedIn: 'root'
@@ -86,11 +87,48 @@ export class DataLocalService {
       arrTemp.push(linea);
     });
 
-    this.crearArchivoFisico(arrTemp.join(''));
+    // this.crearArchivoFisico(arrTemp.join(''));
+    this.compartirDescargarArchivo(arrTemp.join(''));
 
   }
 
-  crearArchivoFisico(texto: string){
+  compartirDescargarArchivo(text: string, descargar: boolean = false ){
+    Filesystem.writeFile({
+      data: text,
+      path: 'registros.csv',
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+    }).then(d=>{
+      console.log(d);
+      this.emailComposer.isAvailable().then((avalible: boolean)=>{
+        if(avalible){
+          const email: EmailComposerOptions = {
+            to: ['antoniomanu533@gmail.com'],
+            cc: [],
+            bcc: [],
+            attachments: [d.uri],
+            subject: 'Mis Scans',
+            body: 'Esto es una copia de seguridad',
+            isHtml: false
+          }
+          this.emailComposer.open(email).then(respuesta=>{
+            if(!descargar){
+              Filesystem.deleteFile({
+                path: 'registros.csv',
+                directory: Directory.Documents,
+              }).then(r=>{
+                console.log(r);
+              })
+            }
+          });
+        }
+      })
+    }).catch(e=>{
+      console.log(e);
+    })
+  }
+
+  crearArchivoFisicoOld(texto: string){
     this.file.checkFile(this.file.dataDirectory,'registros.csv').then(existe=>{
       console.log('Existe Archivo?', existe);
       return this.escribirEnArchivo(texto);
@@ -102,11 +140,11 @@ export class DataLocalService {
         console.log('No se pudo Cargar el Archivo', err);
       })
     })
+    this.escribirEnArchivo(texto);
   }
 
   async escribirEnArchivo(texto: string){
     await this.file.writeExistingFile(this.file.dataDirectory, 'registros.csv',texto);
-
     console.log('File Creado', this.file.dataDirectory + 'registro.csv');
     const archivo = this.file.dataDirectory + 'registro.csv';
     this.emailComposer.isAvailable().then((avalible: boolean)=>{
